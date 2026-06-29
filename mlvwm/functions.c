@@ -811,13 +811,16 @@ void WaitMap( char *action )
 			else
 				name = NoName;
 
-			XGetClassHint(dpy, ev.xmaprequest.window, &class);	
-			if( !strcmp( name, waitname ) ||
-			   !strcmp( class.res_name, waitname ) ||
-			   !strcmp( class.res_class, waitname ) ){
+			class.res_name = class.res_class = NULL;
+			XGetClassHint(dpy, ev.xmaprequest.window, &class);
+			if( (name && !strcmp( name, waitname )) ||
+			   (class.res_name && !strcmp( class.res_name, waitname )) ||
+			   (class.res_class && !strcmp( class.res_class, waitname )) ){
 				done = False;
 				if (protocols) XFree ((char *) protocols);
 			}
+			if( class.res_name )	XFree( class.res_name );
+			if( class.res_class )	XFree( class.res_class );
 		}
 		HandleEvents( ev );
 		if( Scr.flags&STARTING && ev.type==MapNotify &&
