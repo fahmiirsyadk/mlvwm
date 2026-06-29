@@ -1017,6 +1017,7 @@ void SetFocus( MlvwmWindow *t )
 	}
 
 	Scr.ActiveWin=t;
+	EwmhSetActiveWindow( t ? t->w : None );
 	MapMenuBar( Scr.ActiveWin );
 	if( t==NULL || t->flags&TRANSIENT ){
 		ChangeMenuLabel( &(Scr.IconMenu), NULL, Scr.SystemIcon );

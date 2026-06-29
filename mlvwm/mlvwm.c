@@ -299,6 +299,19 @@ Atom _XA_WM_DELETE_WINDOW;
 Atom _XA_WM_DESKTOP;
 Atom _XA_NET_WM_WINDOW_TYPE;
 Atom _XA_NET_WM_WINDOW_TYPE_DESKTOP;
+Atom _XA_NET_SUPPORTED;
+Atom _XA_NET_SUPPORTING_WM_CHECK;
+Atom _XA_NET_NUMBER_OF_DESKTOPS;
+Atom _XA_NET_CURRENT_DESKTOP;
+Atom _XA_NET_DESKTOP_NAMES;
+Atom _XA_NET_DESKTOP_GEOMETRY;
+Atom _XA_NET_DESKTOP_VIEWPORT;
+Atom _XA_NET_WORKAREA;
+Atom _XA_NET_WM_DESKTOP;
+Atom _XA_NET_CLIENT_LIST;
+Atom _XA_NET_ACTIVE_WINDOW;
+Atom _XA_NET_WM_NAME;
+Atom _XA_UTF8_STRING;
 
 void InternUsefulAtoms (void)
 {
@@ -315,8 +328,160 @@ void InternUsefulAtoms (void)
 	_XA_WM_DESKTOP = XInternAtom (dpy, "WM_DESKTOP", False);
 	_XA_NET_WM_WINDOW_TYPE = XInternAtom (dpy, "_NET_WM_WINDOW_TYPE", False);
 	_XA_NET_WM_WINDOW_TYPE_DESKTOP = XInternAtom (dpy, "_NET_WM_WINDOW_TYPE_DESKTOP", False);
+	_XA_NET_SUPPORTED = XInternAtom (dpy, "_NET_SUPPORTED", False);
+	_XA_NET_SUPPORTING_WM_CHECK = XInternAtom (dpy, "_NET_SUPPORTING_WM_CHECK", False);
+	_XA_NET_NUMBER_OF_DESKTOPS = XInternAtom (dpy, "_NET_NUMBER_OF_DESKTOPS", False);
+	_XA_NET_CURRENT_DESKTOP = XInternAtom (dpy, "_NET_CURRENT_DESKTOP", False);
+	_XA_NET_DESKTOP_NAMES = XInternAtom (dpy, "_NET_DESKTOP_NAMES", False);
+	_XA_NET_DESKTOP_GEOMETRY = XInternAtom (dpy, "_NET_DESKTOP_GEOMETRY", False);
+	_XA_NET_DESKTOP_VIEWPORT = XInternAtom (dpy, "_NET_DESKTOP_VIEWPORT", False);
+	_XA_NET_WORKAREA = XInternAtom (dpy, "_NET_WORKAREA", False);
+	_XA_NET_WM_DESKTOP = XInternAtom (dpy, "_NET_WM_DESKTOP", False);
+	_XA_NET_CLIENT_LIST = XInternAtom (dpy, "_NET_CLIENT_LIST", False);
+	_XA_NET_ACTIVE_WINDOW = XInternAtom (dpy, "_NET_ACTIVE_WINDOW", False);
+	_XA_NET_WM_NAME = XInternAtom (dpy, "_NET_WM_NAME", False);
+	_XA_UTF8_STRING = XInternAtom (dpy, "UTF8_STRING", False);
 
 	return;
+}
+
+/* ------------------------------------------------------------------ *
+ *  EWMH (freedesktop _NET_*) desktop / workspace hints.
+ *
+ *  mlvwm has always tracked virtual desktops through its private
+ *  WM_DESKTOP atom; these helpers additionally publish the standard
+ *  _NET_* properties so external pagers, taskbars and tools such as
+ *  wmctrl can see and drive the existing workspaces.  They are pure
+ *  publishers over the existing Scr.* state - no behaviour changes.
+ * ------------------------------------------------------------------ */
+
+static Window ewmh_check_win = None;
+
+void EwmhPublishDesktops( void )
+{
+	long n;
+	char names[16*999], *p;
+	int len, lp;
+
+	n = Scr.n_desktop < 1 ? 1 : Scr.n_desktop;
+	XChangeProperty( dpy, Scr.Root, _XA_NET_NUMBER_OF_DESKTOPS, XA_CARDINAL,
+					 32, PropModeReplace, (unsigned char *)&n, 1 );
+
+	/* NUL-separated UTF8_STRING list: "Desk 0\0Desk 1\0..." - 0-based to
+	   mirror mlvwm's own icon/window-list desktop labels. */
+	p = names;
+	for( lp=0; lp<n && (size_t)(p-names) < sizeof(names)-16; lp++ )
+		p += snprintf( p, 16, "Desk %d", lp ) + 1;
+	len = p - names;
+	XChangeProperty( dpy, Scr.Root, _XA_NET_DESKTOP_NAMES, _XA_UTF8_STRING,
+					 8, PropModeReplace, (unsigned char *)names, len );
+}
+
+void EwmhSetCurrentDesktop( void )
+{
+	long d = Scr.currentdesk;
+	XChangeProperty( dpy, Scr.Root, _XA_NET_CURRENT_DESKTOP, XA_CARDINAL,
+					 32, PropModeReplace, (unsigned char *)&d, 1 );
+}
+
+void EwmhSetWindowDesktop( MlvwmWindow *t )
+{
+	long d;
+	if( !t )		return;
+	d = t->Desk;
+	XChangeProperty( dpy, t->w, _XA_NET_WM_DESKTOP, XA_CARDINAL,
+					 32, PropModeReplace, (unsigned char *)&d, 1 );
+}
+
+void EwmhUpdateClientList( void )
+{
+	MlvwmWindow *t;
+	Window *list;
+	int n = 0, i = 0;
+
+	for( t = Scr.MlvwmRoot.next; t != NULL; t = t->next )		n++;
+	if( n == 0 ){
+		XChangeProperty( dpy, Scr.Root, _XA_NET_CLIENT_LIST, XA_WINDOW,
+						 32, PropModeReplace, (unsigned char *)&i, 0 );
+		return;
+	}
+	list = calloc( n, sizeof(Window) );
+	if( !list )		return;
+	for( t = Scr.MlvwmRoot.next; t != NULL && i < n; t = t->next )
+		list[i++] = t->w;
+	XChangeProperty( dpy, Scr.Root, _XA_NET_CLIENT_LIST, XA_WINDOW,
+					 32, PropModeReplace, (unsigned char *)list, i );
+	free( list );
+}
+
+void EwmhSetActiveWindow( Window w )
+{
+	XChangeProperty( dpy, Scr.Root, _XA_NET_ACTIVE_WINDOW, XA_WINDOW,
+					 32, PropModeReplace, (unsigned char *)&w, 1 );
+}
+
+void EwmhInit( void )
+{
+	long geom[2], view[2];
+	long *work;
+	int nd, lp;
+	XSetWindowAttributes attr;
+
+	/* _NET_SUPPORTING_WM_CHECK: a stable child window carrying _NET_WM_NAME,
+	   referenced from both the root and itself, so clients can confirm an
+	   EWMH-compliant WM is running. */
+	attr.override_redirect = True;
+	ewmh_check_win = XCreateWindow( dpy, Scr.Root, -100, -100, 1, 1, 0,
+									CopyFromParent, InputOnly, CopyFromParent,
+									CWOverrideRedirect, &attr );
+	XChangeProperty( dpy, Scr.Root, _XA_NET_SUPPORTING_WM_CHECK, XA_WINDOW,
+					 32, PropModeReplace, (unsigned char *)&ewmh_check_win, 1 );
+	XChangeProperty( dpy, ewmh_check_win, _XA_NET_SUPPORTING_WM_CHECK, XA_WINDOW,
+					 32, PropModeReplace, (unsigned char *)&ewmh_check_win, 1 );
+	XChangeProperty( dpy, ewmh_check_win, _XA_NET_WM_NAME, _XA_UTF8_STRING,
+					 8, PropModeReplace, (unsigned char *)"mlvwm", 5 );
+
+	{
+		Atom supported[] = {
+			_XA_NET_SUPPORTED, _XA_NET_SUPPORTING_WM_CHECK,
+			_XA_NET_NUMBER_OF_DESKTOPS, _XA_NET_CURRENT_DESKTOP,
+			_XA_NET_DESKTOP_NAMES, _XA_NET_DESKTOP_GEOMETRY,
+			_XA_NET_DESKTOP_VIEWPORT, _XA_NET_WORKAREA,
+			_XA_NET_WM_DESKTOP, _XA_NET_CLIENT_LIST,
+			_XA_NET_ACTIVE_WINDOW, _XA_NET_WM_NAME,
+			_XA_NET_WM_WINDOW_TYPE, _XA_NET_WM_WINDOW_TYPE_DESKTOP,
+		};
+		XChangeProperty( dpy, Scr.Root, _XA_NET_SUPPORTED, XA_ATOM, 32,
+						 PropModeReplace, (unsigned char *)supported,
+						 sizeof(supported)/sizeof(supported[0]) );
+	}
+
+	geom[0] = Scr.MyDisplayWidth;	geom[1] = Scr.MyDisplayHeight;
+	XChangeProperty( dpy, Scr.Root, _XA_NET_DESKTOP_GEOMETRY, XA_CARDINAL,
+					 32, PropModeReplace, (unsigned char *)geom, 2 );
+	view[0] = 0;	view[1] = 0;
+	XChangeProperty( dpy, Scr.Root, _XA_NET_DESKTOP_VIEWPORT, XA_CARDINAL,
+					 32, PropModeReplace, (unsigned char *)view, 2 );
+	/* Work area (excludes the top menu bar), one set of 4 CARDINALs per
+	   desktop as required by the spec - identical for every desktop here. */
+	nd = Scr.n_desktop < 1 ? 1 : Scr.n_desktop;
+	work = calloc( nd * 4, sizeof(long) );
+	if( work ){
+		for( lp=0; lp<nd; lp++ ){
+			work[lp*4+0] = 0;
+			work[lp*4+1] = Scr.bar_width;
+			work[lp*4+2] = Scr.MyDisplayWidth;
+			work[lp*4+3] = Scr.MyDisplayHeight - Scr.bar_width;
+		}
+		XChangeProperty( dpy, Scr.Root, _XA_NET_WORKAREA, XA_CARDINAL,
+						 32, PropModeReplace, (unsigned char *)work, nd*4 );
+		free( work );
+	}
+
+	EwmhPublishDesktops();
+	EwmhSetCurrentDesktop();
+	EwmhUpdateClientList();
+	EwmhSetActiveWindow( None );
 }
 
 int MappedNotOverride( Window w )
@@ -374,10 +539,14 @@ void SaveDesktopState( void )
 		data[0] = (unsigned long) t->Desk;
 		XChangeProperty (dpy, t->w, _XA_WM_DESKTOP, _XA_WM_DESKTOP, 32,
 						 PropModeReplace, (unsigned char *) data, 1);
+		XChangeProperty (dpy, t->w, _XA_NET_WM_DESKTOP, XA_CARDINAL, 32,
+						 PropModeReplace, (unsigned char *) data, 1);
     }
 
 	data[0] = (unsigned long) Scr.currentdesk;
 	XChangeProperty (dpy, Scr.Root, _XA_WM_DESKTOP, _XA_WM_DESKTOP, 32,
+					 PropModeReplace, (unsigned char *) data, 1);
+	XChangeProperty (dpy, Scr.Root, _XA_NET_CURRENT_DESKTOP, XA_CARDINAL, 32,
 					 PropModeReplace, (unsigned char *) data, 1);
 
 	XSync(dpy, 0);
@@ -704,6 +873,7 @@ int main( int argc, char *argv[] )
 		Scr.iconAnchor = Scr.iconAnchor->next );
 	RepaintAllWindows( StartWin );
 	InitDesktop();
+	EwmhInit();
 	if( Scr.StartFunc ) DoStartFunc();
 
 	XDestroyWindow (dpy, StartWin);

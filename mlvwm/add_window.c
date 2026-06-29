@@ -533,8 +533,20 @@ MlvwmWindow *AddWindow( Window win )
 			XFree(prop);
 		}
 	}
+	/* A standard _NET_WM_DESKTOP request (e.g. from wmctrl) takes precedence. */
+	if ((XGetWindowProperty(dpy, tmp_win->w, _XA_NET_WM_DESKTOP, 0L, 1L, False,
+							XA_CARDINAL, &atype, &aformat, &nitems,
+							&bytes_remain, &prop))==Success){
+		if(prop != NULL){
+			if( atype==XA_CARDINAL && nitems>0 )
+				tmp_win->Desk = *(unsigned long *)prop;
+			XFree(prop);
+		}
+	}
 	if( tmp_win->Desk<0 || tmp_win->Desk>=Scr.n_desktop )
 		tmp_win->Desk = 0;
+	EwmhSetWindowDesktop( tmp_win );
+	EwmhUpdateClientList();
 	
 	if( tmp_win->flags&(TITLE|SBARV|SBARH|RESIZER) ){
 		tmp_win->frame_w = tmp_win->attr.width+SBAR_WH+1+2;

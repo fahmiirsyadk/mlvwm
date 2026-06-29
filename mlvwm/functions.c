@@ -346,6 +346,7 @@ void ChangeDesk( char *action )
 	ChangeMenuItemLabel( "ICON", str, str, NULL, SELECTON|CHECKON, M_COPY );
 
 	Scr.currentdesk=newdesk;
+	EwmhSetCurrentDesktop();
 	if( !LastActiveLive )		Active = NULL;
 	SetFocus( Active );
 

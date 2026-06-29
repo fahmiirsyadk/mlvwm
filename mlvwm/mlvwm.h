@@ -178,8 +178,29 @@ extern Atom _XA_WM_DELETE_WINDOW;
 extern Atom _XA_WM_DESKTOP;
 extern Atom _XA_NET_WM_WINDOW_TYPE;
 extern Atom _XA_NET_WM_WINDOW_TYPE_DESKTOP;
+extern Atom _XA_NET_SUPPORTED;
+extern Atom _XA_NET_SUPPORTING_WM_CHECK;
+extern Atom _XA_NET_NUMBER_OF_DESKTOPS;
+extern Atom _XA_NET_CURRENT_DESKTOP;
+extern Atom _XA_NET_DESKTOP_NAMES;
+extern Atom _XA_NET_DESKTOP_GEOMETRY;
+extern Atom _XA_NET_DESKTOP_VIEWPORT;
+extern Atom _XA_NET_WORKAREA;
+extern Atom _XA_NET_WM_DESKTOP;
+extern Atom _XA_NET_CLIENT_LIST;
+extern Atom _XA_NET_ACTIVE_WINDOW;
+extern Atom _XA_NET_WM_NAME;
+extern Atom _XA_UTF8_STRING;
 
 extern void Done( int, char * );
+
+/* EWMH (freedesktop _NET_*) desktop/workspace hint publishers */
+extern void EwmhInit( void );
+extern void EwmhPublishDesktops( void );
+extern void EwmhSetCurrentDesktop( void );
+extern void EwmhSetWindowDesktop( MlvwmWindow * );
+extern void EwmhUpdateClientList( void );
+extern void EwmhSetActiveWindow( Window );
 #ifdef USE_LOCALE
 #define DEFAULTFS "-adobe-*-*-r-*-*-12-*-*-*-p-*-*-*,\
 -*-*-*-r-*-*-12-*-*-*-*-*-*-*"

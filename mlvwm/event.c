@@ -329,6 +329,7 @@ void Destroy( MlvwmWindow *t )
 
 	t->prev->next = t->next;
 	if( t->next != NULL )		t->next->prev = t->prev;
+	EwmhUpdateClientList();
 
 	if( t==Scr.ActiveWin ){
 		if( Scr.PreviousActive == Scr.ActiveWin )
@@ -1838,8 +1839,51 @@ void HandleClientMessage( XEvent *ev )
 	MlvwmWindow *NextActive;
 	char action[24];
 
+	/* Root-targeted EWMH requests (e.g. from wmctrl / a pager). These must be
+	   handled before the managed-client lookup below, which would reject the
+	   root window. */
+	if( ev->xclient.window==Scr.Root || ev->xany.window==Scr.Root ){
+		if( ev->xclient.message_type==_XA_NET_CURRENT_DESKTOP ){
+			char desk[16];
+			snprintf( desk, sizeof(desk), "Desk %ld", ev->xclient.data.l[0] );
+			ChangeDesk( desk );
+		}
+		return;
+	}
+
 	if( XFindContext( dpy, ev->xany.window, MlvwmContext, (caddr_t *)&tmp_win )
 	   == XCNOENT ) return;
+
+	/* _NET_WM_DESKTOP: move a managed window to another desktop and apply it
+	   immediately (mirrors ChangeDesk's per-window map/unmap logic). */
+	if( ev->xclient.message_type==_XA_NET_WM_DESKTOP ){
+		long nd = ev->xclient.data.l[0];
+		if( nd==-1 || nd==0xFFFFFFFF ){		/* all desktops -> make sticky */
+			tmp_win->flags |= STICKY;
+			return;
+		}
+		if( nd>=0 && nd<Scr.n_desktop && nd!=tmp_win->Desk ){
+			tmp_win->Desk = nd;
+			EwmhSetWindowDesktop( tmp_win );
+			if( nd==Scr.currentdesk )
+				MapIt( tmp_win );
+			else
+				UnmapIt( tmp_win );
+		}
+		return;
+	}
+
+	/* _NET_ACTIVE_WINDOW: focus/raise the requested managed window. */
+	if( ev->xclient.message_type==_XA_NET_ACTIVE_WINDOW ){
+		if( tmp_win->Desk!=Scr.currentdesk ){
+			char desk[16];
+			snprintf( desk, sizeof(desk), "Desk %d", tmp_win->Desk );
+			ChangeDesk( desk );
+		}
+		snprintf( action, sizeof(action), "Select %lX", (unsigned long)tmp_win );
+		SelectWindow( action );
+		return;
+	}
 
 	if( ev->xclient.message_type==_XA_WM_CHANGE_STATE ){
 		XGetWindowAttributes(dpy, tmp_win->w, &winattrs);

@@ -17,6 +17,8 @@ typedef struct builtin_func
 extern void ShadeWindow( MlvwmWindow * );
 extern void UnShadeWindow( MlvwmWindow * );
 extern void HideWindow( MlvwmWindow * );
+extern void MapIt( MlvwmWindow * );
+extern void UnmapIt( MlvwmWindow * );
 extern void NopFunction( char * );
 extern void AboutThisMachine( char * );
 extern void RefreshScreen( char * );
