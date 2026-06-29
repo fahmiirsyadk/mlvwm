@@ -36,16 +36,6 @@ sudo apt install gcc make xutils-dev libx11-dev libxext-dev libxpm-dev imagemagi
 sudo pacman -S gcc make imake libx11 libxext libxpm imagemagick
 ```
 
-#### OpenBSD / NetBSD
-
-```
-pkg_add mlvwm
-```
-
-For other distros, see [mlvwm on Repology](https://repology.org/project/mlvwm/versions).
-
-[![Packaging status](https://repology.org/badge/vertical-allrepos/mlvwm.svg)](https://repology.org/project/mlvwm/versions)
-
 ### 2. Build & Install
 
 ```bash
