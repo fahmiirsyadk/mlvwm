@@ -142,6 +142,37 @@ static char *trim(char *s) {
     return s;
 }
 
+/* Quote a string for safe inclusion in a /bin/sh command line.  Wraps the
+ * whole string in single quotes, turning each embedded ' into the sequence
+ * '\''.  This neutralises shell metacharacters in file/icon paths that the
+ * user controls (.lnk files, the Browse dialog, $HOME), so they can never
+ * break out of the quoting and inject commands into system()/sh -c.
+ *
+ * Writes a NUL-terminated result into out (capacity outsz) and returns it.
+ * If the quoted form would not fit, out is set to "''" (an empty argument)
+ * so the surrounding command fails to find its file rather than running an
+ * attacker-controlled fragment. */
+static const char *shell_quote(const char *in, char *out, size_t outsz) {
+    size_t o = 0;
+    if (outsz < 3) { if (outsz) out[0] = '\0'; return out; }
+    out[o++] = '\'';
+    for (; *in; in++) {
+        if (*in == '\'') {
+            if (o + 5 >= outsz) goto overflow;  /* '\'' (4) + closing ' (1) */
+            out[o++] = '\''; out[o++] = '\\'; out[o++] = '\''; out[o++] = '\'';
+        } else {
+            if (o + 2 >= outsz) goto overflow;  /* char + closing ' */
+            out[o++] = *in;
+        }
+    }
+    out[o++] = '\'';
+    out[o] = '\0';
+    return out;
+overflow:
+    out[0] = '\''; out[1] = '\''; out[2] = '\0';
+    return out;
+}
+
 /* Find icon at point */
 static int hit_test(int x, int y) {
     int i;
@@ -249,34 +280,36 @@ static char *convert_to_xpm(const char *src, int w, int h, int wp_mode) {
         st_xpm.st_mtime >= st_src.st_mtime) {
         return xpm_path;
     }
-    char cmd[2048];
+    char cmd[4096];
+    char qsrc[2048];
+    shell_quote(src, qsrc, sizeof(qsrc));
     switch (wp_mode) {
     case WP_SCALE:
         snprintf(cmd, sizeof(cmd),
-                 "convert '%s' -resize %dx%d! '%s' 2>/dev/null",
-                 src, w, h, xpm_path);
+                 "convert %s -resize %dx%d! '%s' 2>/dev/null",
+                 qsrc, w, h, xpm_path);
         break;
     case WP_FIT:
         snprintf(cmd, sizeof(cmd),
-                 "convert '%s' -resize %dx%d -background '#D4D0C8' "
+                 "convert %s -resize %dx%d -background '#D4D0C8' "
                  "-gravity center -extent %dx%d '%s' 2>/dev/null",
-                 src, w, h, w, h, xpm_path);
+                 qsrc, w, h, w, h, xpm_path);
         break;
     case WP_CENTER:
         snprintf(cmd, sizeof(cmd),
-                 "convert '%s' -background '#D4D0C8' "
+                 "convert %s -background '#D4D0C8' "
                  "-gravity center -extent %dx%d '%s' 2>/dev/null",
-                 src, w, h, xpm_path);
+                 qsrc, w, h, xpm_path);
         break;
     case WP_TILE:
         snprintf(cmd, sizeof(cmd),
-                 "convert '%s' '%s' 2>/dev/null",
-                 src, xpm_path);
+                 "convert %s '%s' 2>/dev/null",
+                 qsrc, xpm_path);
         break;
     default:
         snprintf(cmd, sizeof(cmd),
-                 "convert '%s' -resize %dx%d '%s' 2>/dev/null",
-                 src, w, h, xpm_path);
+                 "convert %s -resize %dx%d '%s' 2>/dev/null",
+                 qsrc, w, h, xpm_path);
         break;
     }
     if (system(cmd) != 0) return NULL;
@@ -842,8 +875,10 @@ void DesktopMenuWpMode(char *act) {
 
 void DesktopMenuScreenshot(char *act) {
     int sel = 0;
-    char cmd[1024];
+    char cmd[3072];
     char dir[512];
+    char file[640];
+    char qfile[1300];
     char ts[64];
     time_t now;
     struct tm *tm;
@@ -853,16 +888,18 @@ void DesktopMenuScreenshot(char *act) {
     now = time(NULL);
     tm = localtime(&now);
     strftime(ts, sizeof(ts), "%Y%m%d-%H%M%S", tm);
+    snprintf(file, sizeof(file), "%s/screenshot-%s.png", dir, ts);
+    shell_quote(file, qfile, sizeof(qfile));
     if (sel)
         snprintf(cmd, sizeof(cmd),
-                 "maim -s '%s/screenshot-%s.png' 2>/dev/null || "
-                 "scrot -s '%s/screenshot-%s.png' 2>/dev/null",
-                 dir, ts, dir, ts);
+                 "maim -s %s 2>/dev/null || "
+                 "scrot -s %s 2>/dev/null",
+                 qfile, qfile);
     else
         snprintf(cmd, sizeof(cmd),
-                 "maim '%s/screenshot-%s.png' 2>/dev/null || "
-                 "scrot '%s/screenshot-%s.png' 2>/dev/null",
-                 dir, ts, dir, ts);
+                 "maim %s 2>/dev/null || "
+                 "scrot %s 2>/dev/null",
+                 qfile, qfile);
     if (fork() == 0) { setsid(); execl("/bin/sh", "sh", "-c", cmd, NULL); _exit(1); }
 }
 
