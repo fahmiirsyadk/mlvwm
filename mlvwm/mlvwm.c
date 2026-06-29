@@ -36,6 +36,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <execinfo.h>
+#include <time.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -613,9 +615,12 @@ void Done( int restart, char *command )
 	}
 }
 
+void LogFatal( const char *what );
+
 void SigDone(int nonsense)
 {
 	fprintf( stderr, "Catch Signal in [%s]\n", Scr.ErrorFunc );
+	LogFatal( "Terminating signal (SIGTERM/SIGINT/SIGHUP/SIGQUIT)" );
 	Done(0, NULL);
 	return;
 }
@@ -695,11 +700,62 @@ Window CreateStartWindow( void )
 	return StartWin;
 }
 
-void SegFault( int nosense )
+/* Record a fatal event (signal or X error) plus a backtrace to stderr and to
+   ~/.mlvwm-crash.log, since at real login mlvwm's stderr is discarded by the
+   display manager.  Async-signal-safety is best-effort: backtrace_symbols_fd
+   and write are safe; the snprintf header is a pragmatic compromise. */
+void LogFatal( const char *what )
 {
-	fprintf( stderr,"Segmentation Fault\n" );
-	fprintf( stderr,"\tin %s\n", Scr.ErrorFunc );
+	void *bt[64];
+	int n;
+	const char *home;
+	char path[512];
+	int fd;
+
+	fprintf( stderr, "MLVWM fatal: %s (in %s)\n", what, Scr.ErrorFunc );
+	n = backtrace( bt, 64 );
+	backtrace_symbols_fd( bt, n, 2 );
+
+	home = getenv( "HOME" );
+	if( home ){
+		time_t t = time( NULL );
+		snprintf( path, sizeof(path), "%s/.mlvwm-crash.log", home );
+		fd = open( path, O_WRONLY|O_CREAT|O_APPEND, 0644 );
+		if( fd >= 0 ){
+			char hdr[256];
+			int len = snprintf( hdr, sizeof(hdr),
+				"\n--- %s at %.24s in '%s' ---\n",
+				what, ctime(&t), Scr.ErrorFunc );
+			(void)write( fd, hdr, len );
+			backtrace_symbols_fd( bt, n, fd );
+			close( fd );
+		}
+	}
+}
+
+void SegFault( int sig )
+{
+	const char *name;
+	switch( sig ){
+		case SIGSEGV: name = "Segmentation Fault (SIGSEGV)"; break;
+		case SIGABRT: name = "Abort (SIGABRT)";              break;
+		case SIGBUS:  name = "Bus error (SIGBUS)";           break;
+		case SIGFPE:  name = "Arithmetic error (SIGFPE)";    break;
+		case SIGILL:  name = "Illegal instruction (SIGILL)"; break;
+		default:      name = "Fatal signal";                 break;
+	}
+	LogFatal( name );
 	exit( -1 );
+}
+
+/* The Xlib default I/O-error handler just exits silently when the X server
+   connection dies, which made an early session teardown indistinguishable
+   from a clean exit.  Log it instead. */
+int MlvwmIOErrorHandler( Display *err_dpy )
+{
+	LogFatal( "X I/O error (server connection lost)" );
+	exit( 1 );
+	return 0;
 }
 
 void DoStartFunc( void )
@@ -784,6 +840,11 @@ int main( int argc, char *argv[] )
 	setsighandle( SIGQUIT );
 	setsighandle( SIGTERM );
 	signal( SIGSEGV, SegFault );
+	signal( SIGABRT, SegFault );
+	signal( SIGBUS,  SegFault );
+	signal( SIGFPE,  SegFault );
+	signal( SIGILL,  SegFault );
+	XSetIOErrorHandler( MlvwmIOErrorHandler );
     Scr.NumberOfScreens = ScreenCount(dpy);
 
     if(!single){
