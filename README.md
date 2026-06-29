@@ -1,18 +1,11 @@
-# MLVWM
+<h1 align="center">MLVWM+</h1>
 
-[![MLVWM System 7 Theme](/img/System7-640x360.png?raw=true)](#screenshots)
+<img width="1920" height="1200" alt="screenshot-20260630-005935" src="https://github.com/user-attachments/assets/4462a660-4635-4df2-85f4-b415bc34ee4e" />
+
+
+(note: this is fork, and it might be break on some machine. so DWYOR)
 
 MLVWM (Macintosh-Like Virtual Window Manager) is an X11 window manager with a classic Mac OS 7/8/9 appearance. It provides a global menu bar, window decorations, virtual desktops, desktop icons, wallpaper management, and balloon help.
-
-## Screenshots
-
-Default theme (System 7):
-
-[![Default System 7 Theme](/img/System7-640x360.png?raw=true)](/img/System7-1920x1080.png)
-
-`System8` / MacOS 9 theme:
-
-[![MacOS 8/9 Theme](/img/MacOS8-640x360.png?raw=true)](/img/MacOS8-1920x1080.png)
 
 ## Installation
 
@@ -105,7 +98,7 @@ sudo pacman -S pcmanfm xterm xorg-xclock xorg-xcalc xorg-xeyes imagemagick maim 
 
 ### Installing an Icon Theme (MoNine)
 
-Desktop icons support XPM natively and PNG/JPG via ImageMagick conversion. The [MoNine](https://www.gnome-look.org/p/1ostyle) icon theme provides clean 32x32 icons that work well.
+Desktop icons support XPM natively and PNG/JPG via ImageMagick conversion. The [MoNine](https://github.com/BlissThatMiss/MoNine) icon theme provides clean 32x32 icons that work well.
 
 1. Download MoNine and extract it:
    ```bash
