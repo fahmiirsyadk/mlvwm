@@ -163,6 +163,7 @@ typedef struct MlvwmWindow
 #define DoesWmDeleteWindow      0x00400000
 #define STARTICONIC             0x00800000
 #define NONTRANSIENTDECORATE    0x01000000
+#define ISDESKTOP               0x02000000
 
 #define NORMALWIN		(TITLE | SBARH | SBARV | RESIZER | CLOSER | MINMAXR)
 
@@ -175,6 +176,8 @@ extern Atom _XA_WM_TAKE_FOCUS;
 extern Atom _XA_WM_SAVE_YOURSELF;
 extern Atom _XA_WM_DELETE_WINDOW;
 extern Atom _XA_WM_DESKTOP;
+extern Atom _XA_NET_WM_WINDOW_TYPE;
+extern Atom _XA_NET_WM_WINDOW_TYPE_DESKTOP;
 
 extern void Done( int, char * );
 #ifdef USE_LOCALE

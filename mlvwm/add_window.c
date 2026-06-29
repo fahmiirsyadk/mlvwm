@@ -651,7 +651,36 @@ MlvwmWindow *AddWindow( Window win )
 	}
 	
 	FetchWmProtocols (tmp_win);
-	
+
+	/* Detect _NET_WM_WINDOW_TYPE_DESKTOP (e.g. idesk) so clicks pass through.
+	   Also fall back to checking window class for desktop tools (idesk) that
+	   don't set the EWMH window type property. */
+	{
+		int is_desktop = 0;
+		Atom actual_type;
+		int actual_format;
+		unsigned long nitems_ret, bytes_after;
+		unsigned char *prop_ret = NULL;
+		if( XGetWindowProperty(dpy, tmp_win->w, _XA_NET_WM_WINDOW_TYPE,
+							   0L, 32L, False, XA_ATOM, &actual_type,
+							   &actual_format, &nitems_ret, &bytes_after,
+							   &prop_ret)==Success && prop_ret ){
+			unsigned long i;
+			for( i=0; i<nitems_ret; i++ ){
+				if( ((Atom *)prop_ret)[i] == _XA_NET_WM_WINDOW_TYPE_DESKTOP )
+					is_desktop = 1;
+			}
+			XFree(prop_ret);
+		}
+		/* Fallback: detect known desktop-icon apps by class name */
+		if( !is_desktop && tmp_win->class.res_class &&
+		   (strcmp(tmp_win->class.res_class, "idesk") == 0 ||
+			strcmp(tmp_win->class.res_class, "Idesk") == 0) )
+			is_desktop = 1;
+		if( is_desktop )
+			tmp_win->flags |= ISDESKTOP;
+	}
+
 	if( !(Scr.flags&FOLLOWTOMOUSE) ){
 		XGrabButton(dpy, AnyButton, AnyModifier, tmp_win->frame,True,
 					ButtonPressMask, GrabModeSync,GrabModeAsync,None,

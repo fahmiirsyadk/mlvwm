@@ -17,6 +17,7 @@ XCOMM Do not change from here !
                          balloon.c\
                          borders.c\
                          config.c\
+                         desktop.c\
                          event.c\
                          functions.c\
                          menus.c\

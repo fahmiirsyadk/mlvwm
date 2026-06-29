@@ -124,10 +124,10 @@ functionality:
 
 .IP "\fBDesktopnum\fP \fInum\fP"
 The number of desktops available.  Defaults to 1.
-.IP "\fBStickShade\fP"
+.IP "\fBStickyShade\fP"
 Shaded windows are present no matter what desktop you are on, instead
 of staying on a particular desktop.  This is not the default behavior.
-.IP "\fBStickHide\fP"
+.IP "\fBStickyHide\fP"
 Hidden windows are present no matter what desktop you are on, instead
 of staying on a particular desktop.  This is not the default behavior.
 This means that if you hide a window in one desktop, and move to another,
@@ -146,7 +146,7 @@ line instead of solid.  This causes a slight speed decline.
 The active window is the window the mouse is currently over.  If you move
 the mouse away from the current window and/or over another, you lose
 focus in the current one.  This is not set up by default.
-.IP "\fBSlopyFocus\fP"
+.IP "\fBSloppyFocus\fP"
 It turns on FollowToMouse with the modification of not loosing
 focus when in the root window.
 .IP "\fBSwallowFocusClick\fP"
@@ -207,6 +207,8 @@ The font the menu bar is to use.
 The font the menus are to use.
 .IP "\fBTitleBarFont\fP \fIfont\fP"
 The font on the title bars of windows.
+.IP "\fBBalloonFont\fP \fIfont\fP"
+The font for balloon help popups.
 .IP "\fBRead\fP \fIfilename\fP"
 Reads in a separate configuration file.
 .IP "\fBRestartPreviousState\fP"
@@ -319,6 +321,8 @@ NoSbarH and NoSbarV are defined.
 defined. 
 
 \fBNoCloseR\fP - Close 'button' is removed.  Automatic when NoTitle defined.
+
+\fBNoShadeR\fP - Shade 'button' is removed.  Only effective when System8 is enabled.
 
 \fBNoWinList\fP - Prevents window from being show on the window list.
 

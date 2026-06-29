@@ -585,7 +585,7 @@ XFontStruct **font,
 #endif
 
 #ifdef USE_LOCALE
-	asprintf(&fontname, "%s, %s", fontname, FALLBACK_FONT);
+	{ char *_tmpfontname; asprintf(&_tmpfontname, "%s, %s", fontname, FALLBACK_FONT); fontname = _tmpfontname; }
 	newfont = XCreateFontSet( dpy, fontname, &miss, &n_miss, &def );
 
 	if( Scr.flags & DEBUGOUT )

@@ -17,6 +17,7 @@
 #include "event.h"
 #include "misc.h"
 #include "balloon.h"
+#include "desktop.h"
 
 extern char NoName[];
 
@@ -165,7 +166,7 @@ void MoveWindowFunction( char *action )
 		XBell( dpy, 30 );
 		return;
 	}
-	MoveWindow( tmp_win, &ev, False );
+	MoveWindow( tmp_win, &ev );
 }
 
 void ResizeWindowFunction( char *action )
@@ -848,6 +849,16 @@ builtin_func funcs[] = {
 	{ "ShowBalloon", ShowBalloon },
 	{ "HideActive", HideActiveWindow },
 	{ "HideOthers", HideOtherWindow },
+	{ "IDeskOpen", DesktopMenuOpen },
+	{ "IDeskDelete", DesktopMenuDelete },
+	{ "IDeskRefresh", DesktopMenuRefresh },
+	{ "IDeskArrange", DesktopMenuArrange },
+	{ "IDeskRename", DesktopMenuRename },
+	{ "IDeskNew", DesktopMenuNewLauncher },
+	{ "IDeskBg", DesktopMenuWallpaper },
+	{ "IDeskWall", DesktopMenuWallpaperSet },
+	{ "IDeskWpMode", DesktopMenuWpMode },
+	{ "IDeskShot", DesktopMenuScreenshot },
 	{ "KillWindow", KillWindowFunction },
 	{ "MoveWindow", MoveWindowFunction },
 	{ "NextWindow", SelectNextWindow },

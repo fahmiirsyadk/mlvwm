@@ -47,6 +47,7 @@
 #include "config.h"
 #include "functions.h"
 #include "misc.h"
+#include "desktop.h"
 
 #include <X11/Xproto.h>
 #include <X11/Xatom.h>
@@ -296,6 +297,8 @@ Atom _XA_WM_PROTOCOLS;
 Atom _XA_WM_TAKE_FOCUS;
 Atom _XA_WM_DELETE_WINDOW;
 Atom _XA_WM_DESKTOP;
+Atom _XA_NET_WM_WINDOW_TYPE;
+Atom _XA_NET_WM_WINDOW_TYPE_DESKTOP;
 
 void InternUsefulAtoms (void)
 {
@@ -310,6 +313,8 @@ void InternUsefulAtoms (void)
 	_XA_WM_TAKE_FOCUS = XInternAtom (dpy, "WM_TAKE_FOCUS", False);
 	_XA_WM_DELETE_WINDOW = XInternAtom (dpy, "WM_DELETE_WINDOW", False);
 	_XA_WM_DESKTOP = XInternAtom (dpy, "WM_DESKTOP", False);
+	_XA_NET_WM_WINDOW_TYPE = XInternAtom (dpy, "_NET_WM_WINDOW_TYPE", False);
+	_XA_NET_WM_WINDOW_TYPE_DESKTOP = XInternAtom (dpy, "_NET_WM_WINDOW_TYPE_DESKTOP", False);
 
 	return;
 }
@@ -698,6 +703,7 @@ int main( int argc, char *argv[] )
 		Scr.iconAnchor->next->next != NULL;
 		Scr.iconAnchor = Scr.iconAnchor->next );
 	RepaintAllWindows( StartWin );
+	InitDesktop();
 	if( Scr.StartFunc ) DoStartFunc();
 
 	XDestroyWindow (dpy, StartWin);

@@ -32,6 +32,8 @@ void RedrawMenu( MenuLabel *m, Bool onoroff )
 	XGCValues gcv;
 	Pixel fore_pixel, back_pixel;
 
+	if( m->LabelWin == None )	return;
+
 	if( Scr.flags&SYSTEM8 ){
 		gcm = GCForeground;
 		if( !XGetGCValues( dpy, Scr.MenuBlueGC, gcm, &gcv ) ){
@@ -171,7 +173,7 @@ void DrawStringMenuBar( char *str )
 	XSync( dpy, 0 );
 }
 
-/* X É¸½à¤Î´Ø¿ô¤ÇÂåÍÑ²ÄÇ½ */
+/* X É¸ï¿½ï¿½Î´Ø¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ²ï¿½Ç½ */
 Bool isRect( int px, int py, int x, int y, int width, int height )
 {
 	if( px>x && px<x+width && py>y && py<y+height )		return True;
@@ -825,18 +827,74 @@ void CreateMenuLabel( MenuLabel *ml )
 					  valuemask, &attributes );
 		XSaveContext( dpy, ml->LabelWin, MenuContext, (caddr_t)ml );
 
-		valuemask = CWCursor | CWEventMask | CWBackPixel;
-		attributes.background_pixel = WhitePixel( dpy, Scr.screen );
-		attributes.cursor = Scr.MlvwmCursors[DEFAULT];
-		attributes.event_mask = (SubstructureRedirectMask | ExposureMask | 
-								 SubstructureNotifyMask | PointerMotionMask |
-								 EnterWindowMask | LeaveWindowMask );
-		ml->PullWin = XCreateWindow( dpy, Scr.Root, 0, 0, 10, 10 , 1,
-									CopyFromParent, InputOutput,
-									CopyFromParent,
-									valuemask, &attributes );
-		XSaveContext( dpy, ml->PullWin, MenuContext, (caddr_t)ml );
+		CreatePopupMenuLabel( ml );
 	}
+}
+
+/* Create only the PullWin (the popup body) of a menu label, without a
+ * menu-bar LabelWin.  Used both by CreateMenuLabel above and by standalone
+ * context-menu callers such as the desktop. */
+void CreatePopupMenuLabel( MenuLabel *ml )
+{
+	unsigned long valuemask;
+	XSetWindowAttributes attributes;
+
+	valuemask = CWCursor | CWEventMask | CWBackPixel;
+	attributes.background_pixel = WhitePixel( dpy, Scr.screen );
+	attributes.cursor = Scr.MlvwmCursors[DEFAULT];
+	attributes.event_mask = (SubstructureRedirectMask | ExposureMask |
+							 SubstructureNotifyMask | PointerMotionMask |
+							 EnterWindowMask | LeaveWindowMask );
+	ml->PullWin = XCreateWindow( dpy, Scr.Root, 0, 0, 10, 10 , 1,
+								CopyFromParent, InputOutput,
+								CopyFromParent,
+								valuemask, &attributes );
+	XSaveContext( dpy, ml->PullWin, MenuContext, (caddr_t)ml );
+}
+
+/* Pop up a standalone context menu at root coordinates (x,y) and run the
+ * native modal selection loop.  ChoiseMenu executes the chosen item's action
+ * via ExecMenu when an item is chosen; clicking off any item dismisses with
+ * no action.
+ *
+ * `held' tells us whether a mouse button is still down when the menu opens:
+ *   held=1 (e.g. opened by a right-button press): use ignore=0 so the opening
+ *          button's release leaves the menu up and the NEXT click selects --
+ *          i.e. single-click-to-open, click-to-select.
+ *   held=0 (opened programmatically, no button down): use ignore=1 so the
+ *          user's first click selects an item directly.
+ * Using ignore=1 for a held-open menu would make a quick click select/close
+ * immediately; using ignore=0 for a programmatic menu would waste the first
+ * click.  This picks the right mode for each case. */
+void PopupMenu( MenuLabel *m, int x, int y, int held )
+{
+	Bool side;
+	Window entwin;
+
+	if( m==NULL || m->m_item==NULL )	return;
+
+	side = MapMenu( m, x, x, y, True );
+	if( !GrabEvent( DEFAULT ) ){
+		XBell( dpy, 30 );
+		UnmapMenu( m, UNMAP_WINDOW );
+		return;
+	}
+	if( !held ){
+		/* Programmatic open (no button held): discard stale events left over
+		 * from whatever triggered us -- both button events and, crucially,
+		 * the crossing (Enter/Leave) events from the previous menu closing and
+		 * from establishing this grab.  A stale EnterNotify for another menu
+		 * makes ChoiseMenu end immediately, closing the popup before the user
+		 * can click. */
+		XEvent junk;
+		XSync( dpy, 0 );
+		while( XCheckMaskEvent( dpy, ButtonPressMask | ButtonReleaseMask |
+								EnterWindowMask | LeaveWindowMask, &junk ) )
+			;
+	}
+	ChoiseMenu( m, &entwin, held ? 0 : 1, side );
+	UnmapMenu( m, UNMAP_WINDOW );
+	UnGrabEvent();
 }
 
 void AddMenuItem( MenuLabel *ml, char *label, char *action, char *icon, Icon *miniicon, MenuLabel *submenu, int mode )

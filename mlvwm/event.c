@@ -49,6 +49,7 @@
 #include "functions.h"
 #include "misc.h"
 #include "balloon.h"
+#include "desktop.h"
 
 #include <X11/extensions/shape.h>
 
@@ -1370,9 +1371,23 @@ void handle_button_press( XEvent *ev )
 	   != XCNOENT ){
 		context = GetContext( Tmp_win, ev, &win );
 		XGrabServer( dpy );
-		if( (Tmp_win!=Scr.ActiveWin || Scr.flags&FOLLOWTOMOUSE) )
+		if( (Tmp_win!=Scr.ActiveWin || Scr.flags&FOLLOWTOMOUSE) &&
+			!(Tmp_win->flags&ISDESKTOP) )
 			RaiseMlvwmWindow( Tmp_win );
 		XUngrabServer( dpy );
+
+		if( Tmp_win->flags&ISDESKTOP ){
+			/* Desktop windows (e.g. idesk) get clicks passed through
+			   without stealing focus from the active app.
+			   Drop focus from the active window so the menu bar
+			   returns to the default state. */
+			if( Scr.ActiveWin )
+				SetFocus( NULL );
+			XUngrabPointer( dpy, CurrentTime );
+			XAllowEvents(dpy, ReplayPointer, CurrentTime );
+			XSync(dpy,0);
+			return;
+		}
 
 		if( Tmp_win != Scr.ActiveWin  ){
 			SetFocus( Tmp_win );
@@ -1873,6 +1888,10 @@ void HandleClientMessage( XEvent *ev )
 void HandleEvents( XEvent ev )
 {
 	strcpy( Scr.ErrorFunc, "HandleEvents" );
+	if( IsDesktopWindow( ev.xany.window ) ){
+		HandleDesktopEvent( &ev );
+		return;
+	}
 	switch( ev.type ){
 	  case Expose:
 		strcpy( Scr.ErrorFunc, "Expose" );

@@ -4,7 +4,7 @@ XCOMM Do you want to use Locale?
 XCOMM If you use Solaris 1 and your X11 didn't compile with X_LOCALE,
 XCOMM sometime, you can't find multi-byte character.
 
-#define HasLocale YES
+#define HasLocale NO
 
 XCOMM After version 6.0-current, the name of default rc file is changed.
 XCOMM Do you want to use .desktop to rc file?
