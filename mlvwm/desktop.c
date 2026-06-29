@@ -75,7 +75,6 @@ static DeskIcon icons[MAX_DESKTOP_ICONS];
 static int n_icons = 0;
 static Window desktop_win = None;
 static GC gc = None;
-static GC xor_gc = None;
 static XFontStruct *font = NULL;
 static Pixmap wallpaper_pm = None;
 static Atom a_xrootpmap, a_esetroot;
@@ -89,8 +88,6 @@ static int drag_idx = -1;
 static int drag_x, drag_y;
 static int drag_moved = 0;
 static int drag_orig_x, drag_orig_y;
-static int outline_x, outline_y;
-static int outline_drawn = 0;
 
 /* Click tracking */
 static Time last_click_time = 0;
@@ -395,7 +392,11 @@ static void load_wallpaper(void) {
                 else if (strcmp(m, "fit") == 0) wallpaper_mode = WP_FIT;
                 else wallpaper_mode = WP_SCALE;
             }
-            if (apply_wallpaper(s)) done = 1;
+            /* Apply via current_wallpaper, NOT s: s aliases the `line` buffer
+             * which the mode-line fgets() above has since overwritten.  Using
+             * the stable copy makes the saved path the single source of truth
+             * for both persisting and applying. */
+            if (apply_wallpaper(current_wallpaper)) done = 1;
         }
         fclose(f);
     }
@@ -522,6 +523,34 @@ static void draw_icon(int idx) {
 static void redraw_icons(void) {
     int i;
     for (i = 0; i < n_icons; i++) draw_icon(i);
+}
+
+static int rects_overlap(int ax, int ay, int aw, int ah,
+                         int bx, int by, int bw, int bh) {
+    return ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah;
+}
+
+/* Live icon drag: erase the icon (and caption) at its current position,
+ * revealing the static wallpaper background that the X server repaints for
+ * free, then move it to (nx,ny) and draw the real icon + caption there.
+ * This replaces the old XOR rubber-band outline so the whole icon follows
+ * the cursor.  It stays flicker-free because the only thing cleared is the
+ * icon's own bounding box (wallpaper shows through), and the only icons
+ * repainted are the dragged one plus any neighbour that shared that box. */
+static void drag_icon_to(int idx, int nx, int ny) {
+    int ox, oy, ow, oh, i;
+    icon_bbox(idx, &ox, &oy, &ow, &oh);
+    XClearArea(dpy, desktop_win, ox, oy, ow, oh, False);
+    icons[idx].x = nx;
+    icons[idx].y = ny;
+    for (i = 0; i < n_icons; i++) {
+        int bx, by, bw, bh;
+        if (i == idx) continue;
+        icon_bbox(i, &bx, &by, &bw, &bh);
+        if (rects_overlap(ox, oy, ow, oh, bx, by, bw, bh))
+            draw_icon(i);
+    }
+    draw_icon(idx);
 }
 
 static void snap_to_grid(DeskIcon *ic) {
@@ -952,15 +981,6 @@ void InitDesktop(void) {
     font = XLoadQueryFont(dpy, "-*-fixed-medium-r-*-*-12-*-*-*-*-*-iso8859-*");
     if (font) XSetFont(dpy, gc, font->fid);
 
-    {
-        XGCValues xgcv;
-        xgcv.function = GXxor;
-        xgcv.foreground = BlackPixel(dpy, Scr.screen) ^ WhitePixel(dpy, Scr.screen);
-        xgcv.line_width = 1;
-        xor_gc = XCreateGC(dpy, desktop_win,
-                            GCFunction | GCForeground | GCLineWidth, &xgcv);
-    }
-
     /* Create the native context-menu popups (items added on demand) */
     memset(&desk_menu, 0, sizeof(desk_menu));
     desk_menu.name = strdup("DESKTOP");
@@ -1007,7 +1027,6 @@ void HandleDesktopEvent(XEvent *ev) {
                     drag_moved = 0;
                     drag_orig_x = icons[idx].x;
                     drag_orig_y = icons[idx].y;
-                    outline_drawn = 0;
                 } else {
                     /* Deselect all */
                     int i;
@@ -1044,26 +1063,19 @@ void HandleDesktopEvent(XEvent *ev) {
             break;
         case MotionNotify:
             if (drag_idx >= 0) {
-                int dx = ev->xmotion.x - drag_x;
-                int dy = ev->xmotion.y - drag_y;
-                if (abs(dx) > DRAG_THRESHOLD || abs(dy) > DRAG_THRESHOLD) {
-                    if (!drag_moved) {
-                        int bx, by, bw, bh;
-                        icon_bbox(drag_idx, &bx, &by, &bw, &bh);
-                        XClearArea(dpy, desktop_win, bx, by, bw, bh, False);
-                        redraw_icons();
-                        drag_moved = 1;
-                    }
-                    if (outline_drawn)
-                        XDrawRectangle(dpy, desktop_win, xor_gc,
-                                       outline_x, outline_y,
-                                       ICON_SIZE - 1, ICON_SIZE - 1);
-                    outline_x = drag_orig_x + dx;
-                    outline_y = drag_orig_y + dy;
-                    XDrawRectangle(dpy, desktop_win, xor_gc,
-                                   outline_x, outline_y,
-                                   ICON_SIZE - 1, ICON_SIZE - 1);
-                    outline_drawn = 1;
+                /* Coalesce: jump straight to the most recent queued motion so
+                 * the icon tracks the cursor without lagging behind a backlog
+                 * of intermediate events. */
+                XEvent latest = *ev;
+                while (XCheckTypedWindowEvent(dpy, desktop_win,
+                                              MotionNotify, &latest))
+                    ;
+                int dx = latest.xmotion.x - drag_x;
+                int dy = latest.xmotion.y - drag_y;
+                if (drag_moved ||
+                    abs(dx) > DRAG_THRESHOLD || abs(dy) > DRAG_THRESHOLD) {
+                    drag_moved = 1;
+                    drag_icon_to(drag_idx, drag_orig_x + dx, drag_orig_y + dy);
                 }
             }
             break;
@@ -1088,14 +1100,9 @@ void HandleDesktopEvent(XEvent *ev) {
                         last_click_y = ev->xbutton.y;
                     }
                 } else {
-                    if (outline_drawn) {
-                        XDrawRectangle(dpy, desktop_win, xor_gc,
-                                       outline_x, outline_y,
-                                       ICON_SIZE - 1, ICON_SIZE - 1);
-                        outline_drawn = 0;
-                    }
-                    icons[idx].x = outline_x;
-                    icons[idx].y = outline_y;
+                    /* Live drag already moved icons[idx] to its final spot;
+                     * just persist the new position and repaint cleanly to
+                     * restore z-order for any icons it was dragged across. */
                     save_lnk(idx);
                     click_count = 0;
                     XClearWindow(dpy, desktop_win);
