@@ -314,6 +314,8 @@ Atom _XA_NET_CLIENT_LIST;
 Atom _XA_NET_ACTIVE_WINDOW;
 Atom _XA_NET_WM_NAME;
 Atom _XA_UTF8_STRING;
+Atom _XA_XdndAware;
+Atom _XA_XdndProxy;
 
 void InternUsefulAtoms (void)
 {
@@ -343,6 +345,8 @@ void InternUsefulAtoms (void)
 	_XA_NET_ACTIVE_WINDOW = XInternAtom (dpy, "_NET_ACTIVE_WINDOW", False);
 	_XA_NET_WM_NAME = XInternAtom (dpy, "_NET_WM_NAME", False);
 	_XA_UTF8_STRING = XInternAtom (dpy, "UTF8_STRING", False);
+	_XA_XdndAware = XInternAtom (dpy, "XdndAware", False);
+	_XA_XdndProxy = XInternAtom (dpy, "XdndProxy", False);
 
 	return;
 }

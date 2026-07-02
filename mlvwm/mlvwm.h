@@ -191,6 +191,8 @@ extern Atom _XA_NET_CLIENT_LIST;
 extern Atom _XA_NET_ACTIVE_WINDOW;
 extern Atom _XA_NET_WM_NAME;
 extern Atom _XA_UTF8_STRING;
+extern Atom _XA_XdndAware;
+extern Atom _XA_XdndProxy;
 
 extern void Done( int, char * );
 

@@ -1634,7 +1634,7 @@ void handle_property_request( XEvent *ev )
 	Window JunkRoot;             /* junk window */
 	XTextProperty text_prop;
 	unsigned int JunkWidth, JunkHeight, JunkBW, JunkDepth;
-	char desk[8], *str, action[24];
+	char desk[32], *str, action[24];
 	size_t str_size;
 #ifdef USE_LOCALE
 	int num;
@@ -1647,8 +1647,13 @@ void handle_property_request( XEvent *ev )
 								_XA_WM_DESKTOP, &actual, &actual_format, &nitems,
 								&bytesafter, &prop))==Success){
 			if(prop != NULL){
-				sprintf( desk, "Desk %ld", *(unsigned long *)prop );
-				ChangeDesk( desk );
+				unsigned long d = *(unsigned long *)prop;
+				/* The value is client-controlled; ignore out-of-range
+				   desktops rather than formatting an oversized string. */
+				if( d < (unsigned long)Scr.n_desktop ){
+					snprintf( desk, sizeof(desk), "Desk %lu", d );
+					ChangeDesk( desk );
+				}
 			}
 		}
 		return;
@@ -1701,6 +1706,11 @@ void handle_property_request( XEvent *ev )
 	  default:
 		if( ev->xproperty.atom == _XA_WM_PROTOCOLS)
 			FetchWmProtocols( tmp_win );
+		/* Client may advertise XDND support after being mapped; refresh the
+		   frame's drag-and-drop proxy so cross-app drops keep working. */
+		else if( ev->xproperty.atom == _XA_XdndAware &&
+				ev->xany.window == tmp_win->w )
+			SetupXdndProxy( tmp_win );
 		break;
     }
 }

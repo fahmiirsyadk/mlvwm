@@ -9,6 +9,7 @@
 #define _ADD_WINDOW_
 
 extern void FetchWmProtocols( MlvwmWindow * );
+extern void SetupXdndProxy( MlvwmWindow * );
 extern styles *lookupstyles( char *, XClassHint * );
 extern void create_resizebox( MlvwmWindow * );
 extern void create_scrollbar( MlvwmWindow * );

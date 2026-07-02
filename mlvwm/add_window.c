@@ -387,6 +387,47 @@ void SmartPlacement( MlvwmWindow *t, int width, int height, int *x, int *y )
 }
 
 
+/* Make client-to-client drag-and-drop (XDND) work despite our reparenting.
+ * We reparent every client several levels deep (Root -> frame -> Parent -> w),
+ * and some drag sources (notably Chromium/Electron apps and some GTK paths)
+ * look for the XdndAware property on the top-level frame window instead of
+ * descending the tree to find the client.  Not finding it, they abort the drop
+ * ("nothing happens") or complete the handshake against the wrong window
+ * ("empty file").  We fix this the way the XDND spec prescribes for
+ * reparenting window managers: advertise an XdndProxy on the frame that points
+ * at the real client window.  Sources that already descend correctly find the
+ * client directly and are unaffected. */
+void SetupXdndProxy( MlvwmWindow *tmp_win )
+{
+	Atom actual;
+	int actual_format;
+	unsigned long nitems, bytesafter;
+	unsigned char *prop = NULL;
+	long version;
+	Window client = tmp_win->w;
+
+	/* Only proxy for clients that actually advertise XDND support. */
+	if( XGetWindowProperty( dpy, client, _XA_XdndAware, 0L, 1L, False,
+						   XA_ATOM, &actual, &actual_format, &nitems,
+						   &bytesafter, &prop ) != Success )
+		return;
+	if( prop == NULL || nitems < 1 ){
+		if( prop )		XFree( prop );
+		return;
+	}
+	version = (long)( *(Atom *)prop );
+	XFree( prop );
+
+	/* The frame mirrors the client's XDND version and redirects to it. */
+	XChangeProperty( dpy, tmp_win->frame, _XA_XdndAware, XA_ATOM, 32,
+					PropModeReplace, (unsigned char *)&version, 1 );
+	XChangeProperty( dpy, tmp_win->frame, _XA_XdndProxy, XA_WINDOW, 32,
+					PropModeReplace, (unsigned char *)&client, 1 );
+	/* Per the spec, the proxy target must point XdndProxy at itself. */
+	XChangeProperty( dpy, client, _XA_XdndProxy, XA_WINDOW, 32,
+					PropModeReplace, (unsigned char *)&client, 1 );
+}
+
 MlvwmWindow *AddWindow( Window win )
 {
 	MlvwmWindow *tmp_win, *last;
@@ -692,6 +733,8 @@ MlvwmWindow *AddWindow( Window win )
 		if( is_desktop )
 			tmp_win->flags |= ISDESKTOP;
 	}
+
+	SetupXdndProxy( tmp_win );
 
 	if( !(Scr.flags&FOLLOWTOMOUSE) ){
 		XGrabButton(dpy, AnyButton, AnyModifier, tmp_win->frame,True,
