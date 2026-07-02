@@ -14,6 +14,13 @@
 
 #define MENUB_H			20
 
+/* Workspace pager geometry (the row of desktop squares on the menu bar) */
+#define PAGER_CELL_W	12
+#define PAGER_CELL_H	12
+#define PAGER_GAP		1
+#define PAGER_FRAME		2
+#define PAGER_MARGIN	10
+
 /* Definitions of Menu Item */
 #define STRGRAY  1 /* Draw String Black or Gray? */
 #define ICONGRAY 2 /* Draw Icon Gray */
@@ -130,4 +137,7 @@ extern void ChangeMenuItemLabel( char *, char *, char *, char *, int, int );
 extern void FreeShortCut( void );
 extern void DrawStringMenuBar( char * );
 extern void CreateSimpleMenu( void );
+extern void CreatePager( void );
+extern void RedrawPager( void );
+extern int PagerCellAt( int );
 #endif

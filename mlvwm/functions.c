@@ -15,6 +15,7 @@
 #include "functions.h"
 #include "borders.h"
 #include "event.h"
+#include "menus.h"
 #include "misc.h"
 #include "balloon.h"
 #include "desktop.h"
@@ -347,6 +348,7 @@ void ChangeDesk( char *action )
 
 	Scr.currentdesk=newdesk;
 	EwmhSetCurrentDesktop();
+	RedrawPager();
 	if( !LastActiveLive )		Active = NULL;
 	SetFocus( Active );
 

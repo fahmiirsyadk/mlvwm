@@ -68,6 +68,8 @@ typedef struct ScreenInfo
 	MenuItem *iconAnchor;
 	Window Root;
 	Window MenuBar;
+	Window Pager;
+	int PagerWidth;
 	Window NoFocusWin;
 	Window lbCorner;
 	Window rbCorner;
@@ -143,6 +145,7 @@ typedef struct ScreenInfo
 #define DEBUGOUT            0x00020000
 #define ROUNDEDCORNERS      0x00040000
 #define SWALLOWFOCUSCLICK   0x00080000
+#define WORKSPACEPAGER      0x00100000
 
 #ifdef USE_LOCALE
 #define MENUBARFONT Scr.MenuBarFs

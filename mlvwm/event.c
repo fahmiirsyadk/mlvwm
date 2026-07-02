@@ -1435,6 +1435,15 @@ void handle_button_press( XEvent *ev )
 	}
 	else{
 		if( ev->xbutton.button != Button1 )						return;
+		if( (Scr.flags&WORKSPACEPAGER) && ev->xany.window == Scr.Pager ){
+			int d = PagerCellAt( ev->xbutton.x );
+			if( d >= 0 && d < Scr.n_desktop && d != Scr.currentdesk ){
+				char msg[16];
+				sprintf( msg, "Desk %d", d );
+				ChangeDesk( msg );
+			}
+			return;
+		}
 		if( XFindContext( dpy, ev->xany.window,
 						 MenuContext, (caddr_t *)&tmp_menu )==XCNOENT )
 			tmp_menu = NULL;
@@ -1498,6 +1507,8 @@ void handle_expose( XEvent *ev )
 	}
 	if( ev->xany.window == Scr.MenuBar )
 		RedrawMenuBar();
+	if( ev->xany.window == Scr.Pager )
+		RedrawPager();
 	if( XFindContext( dpy, ev->xany.window, MenuContext, (caddr_t *)&Tmp_menu )
 	   != XCNOENT )
 		RedrawMenu( Tmp_menu, False );

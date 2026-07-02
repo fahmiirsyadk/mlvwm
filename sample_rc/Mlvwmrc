@@ -1,6 +1,10 @@
 ## Number of Desktop
 Desktopnum	3
 
+## Show a workspace pager (one square per desktop) at the right of the menu bar.
+## Click a square to switch desktops; the current desktop is highlighted.
+#WorkspacePager
+
 ## Follow mouse activation of window
 #FollowToMouse
 

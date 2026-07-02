@@ -173,6 +173,88 @@ void DrawStringMenuBar( char *str )
 	XSync( dpy, 0 );
 }
 
+/* Total pixel width of the workspace pager for the current desktop count. */
+static int PagerWidth( void )
+{
+	return Scr.n_desktop*PAGER_CELL_W +
+		   (Scr.n_desktop+1)*PAGER_GAP + PAGER_FRAME*2;
+}
+
+/* Pixel height of the pager (fits inside the menu bar). */
+static int PagerHeight( void )
+{
+	return PAGER_CELL_H + PAGER_GAP*2 + PAGER_FRAME*2;
+}
+
+/* Create the workspace-pager window as a child of the menu bar.  Called from
+ * CreateMenuItems (after the config file has been read, so the WorkspacePager
+ * flag and Scr.n_desktop are known).  Only created when the pager is enabled
+ * and there is more than one desktop to show. */
+void CreatePager( void )
+{
+	unsigned long valuemask;
+	XSetWindowAttributes attributes;
+
+	if( !(Scr.flags&WORKSPACEPAGER) || Scr.n_desktop < 2 )	return;
+
+	Scr.PagerWidth = PagerWidth();
+
+	valuemask = CWCursor | CWBackPixel | CWEventMask;
+	attributes.cursor = Scr.MlvwmCursors[DEFAULT];
+	attributes.background_pixel = WhitePixel( dpy, Scr.screen );
+	attributes.event_mask = (ButtonPressMask | ButtonReleaseMask |
+							 ExposureMask | OwnerGrabButtonMask );
+	Scr.Pager = XCreateWindow( dpy, Scr.MenuBar, 0, (MENUB_H-PagerHeight())/2,
+							  Scr.PagerWidth, PagerHeight(), 0,
+							  CopyFromParent, InputOutput, CopyFromParent,
+							  valuemask, &attributes );
+}
+
+/* Draw the row of desktop squares, highlighting the current desktop. */
+void RedrawPager( void )
+{
+	int lp, cx, cy;
+
+	if( !(Scr.flags&WORKSPACEPAGER) || Scr.n_desktop < 2 || !Scr.Pager )
+		return;
+
+	if( Scr.PagerWidth != PagerWidth() ){
+		Scr.PagerWidth = PagerWidth();
+		XResizeWindow( dpy, Scr.Pager, Scr.PagerWidth, PagerHeight() );
+	}
+
+	XClearWindow( dpy, Scr.Pager );
+	DrawShadowBox( 0, 0, Scr.PagerWidth, PagerHeight(), Scr.Pager, 1,
+				  Scr.Gray1GC, Scr.WhiteGC, SHADOW_ALL );
+
+	cy = PAGER_FRAME + PAGER_GAP;
+	for( lp=0; lp<Scr.n_desktop; lp++ ){
+		cx = PAGER_FRAME + PAGER_GAP + lp*(PAGER_CELL_W+PAGER_GAP);
+		XFillRectangle( dpy, Scr.Pager,
+					   lp==Scr.currentdesk ?
+					   (Scr.d_depth>1 ? Scr.MenuSelectBlueGC : Scr.BlackGC) :
+					   (Scr.d_depth>1 ? Scr.Gray4GC : Scr.WhiteGC),
+					   cx, cy, PAGER_CELL_W, PAGER_CELL_H );
+		XDrawRectangle( dpy, Scr.Pager, Scr.BlackGC,
+					   cx, cy, PAGER_CELL_W, PAGER_CELL_H );
+	}
+}
+
+/* Map an x-coordinate inside the pager window to a desktop index, or -1 when
+ * the click landed on the frame or a gap between cells. */
+int PagerCellAt( int x )
+{
+	int idx, cell;
+
+	x -= PAGER_FRAME + PAGER_GAP;
+	if( x < 0 )		return -1;
+	cell = PAGER_CELL_W + PAGER_GAP;
+	idx = x / cell;
+	if( x % cell >= PAGER_CELL_W )		return -1;	/* landed in a gap */
+	if( idx < 0 || idx >= Scr.n_desktop )	return -1;
+	return idx;
+}
+
 /* X ɸ��δؿ������Ѳ�ǽ */
 Bool isRect( int px, int py, int x, int y, int width, int height )
 {
@@ -943,6 +1025,8 @@ void CreateMenuItems( void )
 	Scr.IconMenu.LabelStr = NULL;
 	CreateMenuLabel( &Scr.IconMenu );
 
+	CreatePager();
+
 	for(tmpmenu=Scr.MenuLabelRoot;tmpmenu!=NULL;tmpmenu=tmpmenu->next)
 		CreateMenuLabel( tmpmenu );
 }
@@ -1404,8 +1488,19 @@ void MapMenuBar( MlvwmWindow *win )
 
 	if( Scr.flags&STARTING )	return;
 	left = 10;
-	right = Scr.MyDisplayWidth-Scr.IconMenu.LabelWidth-10;
+	right = Scr.MyDisplayWidth-10;
 
+	/* Anchor the workspace pager at the far-right corner; the icon menu then
+	 * sits just to its left. */
+	if( (Scr.flags&WORKSPACEPAGER) && Scr.Pager && Scr.n_desktop>1 ){
+		int pagerX = right - Scr.PagerWidth;
+		XMoveWindow( dpy, Scr.Pager, pagerX, (MENUB_H-PagerHeight())/2 );
+		XMapWindow( dpy, Scr.Pager );
+		RedrawPager();
+		right = pagerX - 6;
+	}
+
+	right -= Scr.IconMenu.LabelWidth;
 	XMoveWindow( dpy, Scr.IconMenu.LabelWin, right, 1 );
 	Scr.IconMenu.LabelX = right;
 	right--;

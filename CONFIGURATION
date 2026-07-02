@@ -85,6 +85,11 @@ The item which can be set by the initialization file is as the next.
 
      Desktopnum
        Virtual screen number of sheets. Default is 1.
+     WorkspacePager
+       Show a workspace pager at the right-hand corner of the menu bar:
+       one small square per desktop, with the current desktop highlighted.
+       Click a square to switch to that desktop. Shown only when more than
+       one desktop is configured. It isn't set up with the default.
      StickyShade
        The shaded windows are indicated instead of the desk-top
        movement. It isn't set up with the default.

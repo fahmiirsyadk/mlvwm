@@ -742,6 +742,11 @@ void SetRoundedCorners( char *line, FILE *fp )
     Scr.flags |= ROUNDEDCORNERS;
 }
 
+void SetWorkspacePager( char *line, FILE *fp )
+{
+    Scr.flags |= WORKSPACEPAGER;
+}
+
 config_func main_config[]={
 	{ "Desktopnum", SetDeskTopNum },
 	{ "DoubleClickTime", SetDoubleClickTime },
@@ -782,6 +787,7 @@ config_func main_config[]={
 	{ "TitleBarFont", SetFontConfig },
 	{ "UseBalloon", SetBalloonHelp },
 	{ "UseRootWin", SetUseRootWin },
+	{ "WorkspacePager", SetWorkspacePager },
 	{ "ZoomWait", SetZoomWait },
 	{ NULL, 0 }
 };
